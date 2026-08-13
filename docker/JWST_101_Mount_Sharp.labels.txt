@@ -1,0 +1,3 @@
+877,187,Rock Outcrop
+423,90,Bedrock
+1204,472,Basalt Rock

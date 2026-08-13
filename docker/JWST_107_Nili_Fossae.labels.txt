@@ -1,0 +1,3 @@
+912,501,Hydrated Minerals
+838,305,Rock Outcrop
+652,337,Weathered Boulder

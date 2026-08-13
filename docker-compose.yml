@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  streamer:
+    build: ./docker
+
+    environment:
+      INPUT_SOURCE: ${INPUT_SOURCE}
+      YOUTUBE_STREAM_KEY: ${YOUTUBE_STREAM_KEY}
+
+    restart: unless-stopped

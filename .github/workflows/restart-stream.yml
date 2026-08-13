@@ -1,0 +1,18 @@
+name: Restart Stream on Completion
+on:
+  workflow_run:
+    workflows: ["Stream"]
+    types: [completed]
+
+permissions:
+  actions: write
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger next Stream run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run stream.yml --repo ${{ github.repository }} --ref main -f auto_restart=true

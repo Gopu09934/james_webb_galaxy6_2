@@ -1,0 +1,3 @@
+739,128,RIMFAX Survey Area
+1024,314,Layered Terrain
+414,233,Remote Science Point

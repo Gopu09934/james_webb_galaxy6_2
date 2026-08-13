@@ -1,0 +1,29 @@
+name: Stream Watchdog
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure Stream is running
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          active=$(gh run list --workflow=stream.yml --status=in_progress --json databaseId --jq 'length' --repo "${{ github.repository }}")
+          queued=$(gh run list --workflow=stream.yml --status=queued --json databaseId --jq 'length' --repo "${{ github.repository }}")
+
+          echo "In-progress Stream runs: $active"
+          echo "Queued Stream runs: $queued"
+
+          if [ "$active" -eq 0 ] && [ "$queued" -eq 0 ]; then
+            echo "No Stream run active or queued — starting one now."
+            gh workflow run stream.yml --repo "${{ github.repository }}" --ref main -f auto_restart=true
+          else
+            echo "Stream is already running or queued — nothing to do."
+          fi

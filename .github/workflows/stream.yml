@@ -1,0 +1,73 @@
+name: Stream
+on:
+  workflow_dispatch:
+    inputs:
+      auto_restart:
+        description: 'Set automatically by the restart workflow — leave unchecked for manual runs (forces a fresh rebuild)'
+        required: false
+        type: boolean
+        default: false
+  schedule:
+   - cron: "0 */6 * * *"
+
+concurrency:
+  group: stream-job
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Determine build mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.auto_restart }}" != "true" ]; then
+            echo "Manual run detected — will rebuild the image from scratch."
+            echo "BUILD=true" >> "$GITHUB_ENV"
+          else
+            echo "Scheduled or auto-restarted run — will pull the cached image."
+            echo "BUILD=false" >> "$GITHUB_ENV"
+          fi
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/yt-stream" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        if: env.BUILD == 'true'
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        if: env.BUILD == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push fresh image (manual runs only)
+        if: env.BUILD == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker
+          push: true
+          tags: ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Pull cached image (auto-restart / scheduled runs)
+        if: env.BUILD != 'true'
+        run: docker pull "$IMAGE:latest"
+
+      - name: Start YouTube Stream
+        run: |
+          docker run \
+            -e VIDEO_URL="${{ secrets.VIDEO_URL }}" \
+            -e YOUTUBE_STREAM_KEY="${{ secrets.YOUTUBE_STREAM_KEY }}" \
+            -e YOUTUBE_API_KEY="${{ secrets.YOUTUBE_API_KEY }}" \
+            -e YOUTUBE_CHANNEL_ID="${{ secrets.YOUTUBE_CHANNEL_ID }}" \
+            "$IMAGE:latest"
