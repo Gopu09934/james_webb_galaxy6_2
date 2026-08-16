@@ -29,8 +29,13 @@ echo "FPS               : 30"
 echo "========================================"
 
 FONT="font.ttf"
-GOLD="0xE8A33D"
-RED="0xE8453C"
+# Premium Mars theme: deep copper/bronze accent + muted rust-red instead
+# of the old bright amber/red combo, plus a warm near-black (instead of
+# flat black) for all panel backgrounds so they read as "dusty Martian
+# night" rather than generic dark-UI grey.
+GOLD="0xC17F3E"        # copper/bronze accent (dividers, headers, borders, ring pulse)
+RED="0xB33A2E"         # muted rust-red accent (LIVE dot, CTA dot)
+PANEL_BG="0x140B08"    # warm near-black used behind all panel/ticker/CTA boxes
 ASSET_DIR="panel_assets"
 INFO_FILE="galaxy_info.txt"
 SLOT=6            # seconds each headline is shown
@@ -110,7 +115,7 @@ mkdir -p "$ASSET_DIR"
 # have a matching .labels.txt file.
 #############################################
 DOT_MARKER="dot_marker.png"
-GOLD_R=232; GOLD_G=163; GOLD_B=61
+GOLD_R=193; GOLD_G=127; GOLD_B=62
 DOT_VF="format=rgba,geq=r=(if(lte(hypot(X-10\,Y-10)\,5)\,${GOLD_R}\,if(lte(hypot(X-10\,Y-10)\,8)\,255\,0))):g=(if(lte(hypot(X-10\,Y-10)\,5)\,${GOLD_G}\,if(lte(hypot(X-10\,Y-10)\,8)\,255\,0))):b=(if(lte(hypot(X-10\,Y-10)\,5)\,${GOLD_B}\,if(lte(hypot(X-10\,Y-10)\,8)\,255\,0))):a=(if(lte(hypot(X-10\,Y-10)\,8)\,255\,0))"
 ffmpeg -y -f lavfi -i "color=c=black@0.0:s=20x20" -vf "$DOT_VF" -frames:v 1 "$DOT_MARKER" -loglevel error
 if [ ! -s "$DOT_MARKER" ]; then
@@ -122,6 +127,41 @@ if [ ! -s "$DOT_MARKER" ]; then
     # itself keeps running instead of crashing on a missing input file).
     echo "WARNING: geq-based marker generation failed — using a blank 1x1 fallback."
     echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" | base64 -d > "$DOT_MARKER"
+fi
+
+#############################################
+# Generate the right-panel "Featured Image"
+# asset once at startup, cropped to exactly the
+# 294x176 box it's overlaid into (see the
+# "Featured image block" in prepare_video_content),
+# so no per-frame scaling filter is needed and
+# every video streams the same pre-baked file.
+#
+# MARS_SOURCE_IMG is expected to sit alongside
+# overlay.png/font.ttf in the working directory
+# (e.g. a NASA/JPL-Caltech Mars photo committed
+# to the repo). Same guaranteed-to-exist pattern
+# as DOT_MARKER above: if the source is missing
+# or the crop fails, fall back to a blank 1x1
+# transparent pixel so this input is always a
+# valid file and the stream never crashes on a
+# missing -i target — the box border/label still
+# render, just without a photo inside.
+#############################################
+MARS_SOURCE_IMG="mars_photo.jpg"
+MARS_PANEL_IMG="mars_panel.png"
+MARS_PANEL_W=294
+MARS_PANEL_H=176
+if [ -f "$MARS_SOURCE_IMG" ]; then
+    ffmpeg -y -i "$MARS_SOURCE_IMG" \
+        -vf "scale=${MARS_PANEL_W}:${MARS_PANEL_H}:force_original_aspect_ratio=increase,crop=${MARS_PANEL_W}:${MARS_PANEL_H},format=rgba" \
+        -frames:v 1 "$MARS_PANEL_IMG" -loglevel error || true
+else
+    echo "NOTICE: ${MARS_SOURCE_IMG} not found — right-panel featured image will be blank (border/label still show)."
+fi
+if [ ! -s "$MARS_PANEL_IMG" ]; then
+    [ -f "$MARS_SOURCE_IMG" ] && echo "WARNING: Mars panel image generation failed — using a blank 1x1 fallback."
+    echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" | base64 -d > "$MARS_PANEL_IMG"
 fi
 
 #############################################
@@ -316,6 +356,7 @@ printf 'Landed: 18 Feb 2021' > "$ASSET_DIR/rp_line3.txt"
 printf 'Site: Jezero Crater' > "$ASSET_DIR/rp_line4.txt"
 printf 'ENVIRONMENTAL DATA (est.)' > "$ASSET_DIR/rp_env_header.txt"
 printf 'WIND TREND (est.)' > "$ASSET_DIR/rp_wind_label.txt"
+printf 'FEATURED IMAGE' > "$ASSET_DIR/rp_img_label.txt"
 
 #############################################
 # Default headline / fact pools (used as a
@@ -722,7 +763,7 @@ prepare_video_content() {
     build_labels_chain "$url"
     CHAIN+="$LABELS_CHAIN"
 
-    CHAIN+="${LABELS_OUT}drawbox=x=0:y=0:w=333:h=720:color=black@0.60:t=fill[p1];"
+    CHAIN+="${LABELS_OUT}drawbox=x=0:y=0:w=333:h=720:color=${PANEL_BG}@0.65:t=fill[p1];"
     CHAIN+="[p1]drawbox=x=333:y=0:w=4:h=720:color=black@0.45:t=fill[p2];"
     CHAIN+="[p2]drawbox=x=337:y=0:w=4:h=720:color=black@0.30:t=fill[p3];"
     CHAIN+="[p3]drawbox=x=341:y=0:w=4:h=720:color=black@0.15:t=fill[p4];"
@@ -756,7 +797,7 @@ prepare_video_content() {
     # everything above this block is unchanged.
     #########################################
     local rx=$RIGHT_PANEL_X
-    CHAIN+="[p16]drawbox=x=${rx}:y=0:w=${RIGHT_PANEL_W}:h=${RIGHT_PANEL_H}:color=black@0.60:t=fill[rp1];"
+    CHAIN+="[p16]drawbox=x=${rx}:y=0:w=${RIGHT_PANEL_W}:h=${RIGHT_PANEL_H}:color=${PANEL_BG}@0.65:t=fill[rp1];"
     CHAIN+="[rp1]drawbox=x=$((rx-4)):y=0:w=4:h=${RIGHT_PANEL_H}:color=black@0.45:t=fill[rp2];"
     CHAIN+="[rp2]drawbox=x=$((rx-8)):y=0:w=4:h=${RIGHT_PANEL_H}:color=black@0.30:t=fill[rp3];"
     CHAIN+="[rp3]drawbox=x=${rx}:y=0:w=${RIGHT_PANEL_W}:h=4:color=${GOLD}@0.9:t=fill[rp4];"
@@ -781,7 +822,28 @@ prepare_video_content() {
 
     CHAIN+="[rp18]drawbox=x=$((rx+27)):y=320:w=294:h=2:color=${GOLD}@0.4:t=fill[rp19];"
     CHAIN+="[rp19]drawtext=fontfile=${FONT}:textfile=${ASSET_DIR}/rp_wind_label.txt:fontcolor=${GOLD}@0.85:fontsize=12:x=$((rx+27)):y=332[rp20];"
-    CHAIN+="[rp20]drawtext=fontfile=${FONT}:textfile=${ASSET_DIR}/rp_spark.txt:reload=1:fontcolor=${GOLD}:fontsize=26:x=$((rx+27)):y=352[rp_end];"
+    CHAIN+="[rp20]drawtext=fontfile=${FONT}:textfile=${ASSET_DIR}/rp_spark.txt:reload=1:fontcolor=${GOLD}:fontsize=26:x=$((rx+27)):y=352[rp20b];"
+
+    #########################################
+    # Featured image block: fills the previously
+    # empty lower section of the right panel
+    # (y ~396-604, still inside RIGHT_PANEL_H=610
+    # so it never collides with the CTA box /
+    # ticker built later in build_final_filter).
+    # Uses the pre-baked, exactly-294x176 Mars
+    # panel image (ffmpeg input index 3, see
+    # MARS_PANEL_IMG generation near the top of
+    # this script and the -i list in run_video())
+    # — no runtime scaling needed since the image
+    # was already cropped to the box size once at
+    # startup, same "prepare once" pattern as
+    # DOT_MARKER.
+    #########################################
+    CHAIN+="[rp20b]drawbox=x=$((rx+27)):y=396:w=294:h=2:color=${GOLD}@0.4:t=fill[rp21];"
+    CHAIN+="[rp21]drawtext=fontfile=${FONT}:textfile=${ASSET_DIR}/rp_img_label.txt:fontcolor=${GOLD}@0.85:fontsize=12:x=$((rx+27)):y=408[rp22];"
+    CHAIN+="[rp22][3:v]overlay=x=$((rx+27)):y=428[rp23];"
+    CHAIN+="[rp23]drawbox=x=$((rx+27)):y=428:w=294:h=176:color=${GOLD}@0.7:t=2[rp24];"
+    CHAIN+="[rp24]drawtext=fontfile=${FONT}:text='NASA/JPL-Caltech':fontcolor=white@0.6:fontsize=10:x=$((rx+27+294-140)):y=$((428+176-16)):${SHADOW}[rp_end];"
 
     local prev="rp_end"
     for i in "${!RAW_LINES[@]}"; do
@@ -858,7 +920,7 @@ build_final_filter() {
     local CTA_ENABLE="between(mod(t\,${CTA_CYCLE})\,0\,${CTA_SHOW})"
     local COUNTDOWN_ENABLE="not(${CTA_ENABLE})"
 
-    tail+="[${FACT_END}]drawbox=x=733:y=620:w=507:h=43:color=black@0.75:t=fill[cta_bg];"
+    tail+="[${FACT_END}]drawbox=x=733:y=620:w=507:h=43:color=${PANEL_BG}@0.80:t=fill[cta_bg];"
     tail+="[cta_bg]drawbox=x=733:y=620:w=4:h=43:color=${GOLD}:t=fill[cta_bar];"
     tail+="[cta_bar]drawbox=x=755:y=636:w=11:h=11:color=${RED}:t=fill:enable='${CTA_ENABLE}'[cta_dot];"
     tail+="[cta_dot]drawtext=fontfile=${FONT}:textfile=${ASSET_DIR}/cta.txt:fontcolor=white:fontsize=19:x=773:y=633:alpha='${CTA_ALPHA}'[cta_sub];"
@@ -869,7 +931,7 @@ build_final_filter() {
         tail+="[cta_sub]drawtext=fontfile=${FONT}:text='Coming up next...':fontcolor=white@0.85:fontsize=19:x=773:y=633:enable='${COUNTDOWN_ENABLE}'[cta_final];"
     fi
 
-    tail+="[cta_final]drawbox=x=0:y=680:w=1280:h=40:color=black@0.72:t=fill[tk1];"
+    tail+="[cta_final]drawbox=x=0:y=680:w=1280:h=40:color=${PANEL_BG}@0.78:t=fill[tk1];"
     tail+="[tk1]drawbox=x=0:y=680:w=1280:h=2:color=${GOLD}@0.9:t=fill[tk2];"
     tail+="[tk2]drawtext=fontfile=${FONT}:textfile=${ASSET_DIR}/ticker.txt:fontcolor=white:fontsize=17:borderw=2:bordercolor=black@0.6:y=695:x='w-mod(t*${TICKER_SPEED}\,text_w+w)'[tk3];"
     tail+="[tk3]drawbox=x=0:y=680:w=120:h=40:color=black@0.85:t=fill[tk4];"
@@ -887,7 +949,7 @@ build_final_filter() {
     local sub_ring_d=$((SUB_ICON_R * 2))
     tail+="[wm1]drawbox=x=${sub_ring_x}:y=${sub_ring_y}:w=${sub_ring_d}:h=${sub_ring_d}:color=${GOLD}@0.9:t=3:enable='${SUB_PULSE_ENABLE}'[wm2];"
 
-    tail+="[wm2]drawbox=x=0:y=0:w=1280:h=720:color=black@0.5:t=2[final]"
+    tail+="[wm2]drawbox=x=0:y=0:w=1280:h=720:color=${PANEL_BG}@0.5:t=2[final]"
 
     echo "$tail"
 }
@@ -939,7 +1001,7 @@ run_bumper() {
 
     local BFILTER
     BFILTER="[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[bg];"
-    BFILTER+="[bg]drawbox=x=0:y=0:w=1280:h=720:color=black@0.55:t=fill[b1];"
+    BFILTER+="[bg]drawbox=x=0:y=0:w=1280:h=720:color=${PANEL_BG}@0.60:t=fill[b1];"
     BFILTER+="[b1]drawbox=x=27:y=28:w=11:h=11:color=${RED}:t=fill:enable='lt(mod(t\,1)\,0.6)'[b2];"
     BFILTER+="[b2]drawtext=fontfile=${FONT}:text='LIVE':fontcolor=white:fontsize=30:x=44:y=19[b3];"
     BFILTER+="[b3]drawbox=x=0:y=313:w=1280:h=2:color=${GOLD}@0.8:t=fill[b4];"
@@ -1026,6 +1088,7 @@ run_video() {
         -i "$url" \
         -loop 1 -i overlay.png \
         -loop 1 -i "$DOT_MARKER" \
+        -loop 1 -i "$MARS_PANEL_IMG" \
         -filter_complex "$filter" \
         -map "[final]" \
         -map 0:a? \
