@@ -1,0 +1,4 @@
+528,356,Olympus Mons
+781,192,Ascraeus Mons
+641,523,Arsia Mons
+846,391,Tharsis Plateau

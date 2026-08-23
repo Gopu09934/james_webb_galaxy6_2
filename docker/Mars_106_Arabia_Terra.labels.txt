@@ -1,0 +1,4 @@
+467,224,Jezero Crater Basalt Rock
+695,318,Artuby Ridge Bedrock
+574,467,Seitah Layered Rock
+821,506,Neretva Vallis Rock Outcrop

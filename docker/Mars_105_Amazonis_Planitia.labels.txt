@@ -1,0 +1,4 @@
+491,432,Weathered Rock
+668,176,Rock Ridge
+803,354,Dark Rock
+557,521,Exposed Rock

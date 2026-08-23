@@ -1,0 +1,4 @@
+528,356,Fractured Rock
+781,192,Rock Formation
+641,523,Loose Rock
+873,447,Rock Surface

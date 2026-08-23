@@ -1,0 +1,4 @@
+512,185,Rock Outcrop
+742,268,Bedrock
+638,412,Basalt Rock
+821,506,Rock Debris
